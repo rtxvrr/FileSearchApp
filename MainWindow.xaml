@@ -1,0 +1,38 @@
+﻿<Window x:Class="FileSearchApp.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:FileSearchApp"
+        Title="File Search App" Height="470" Width="600" WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <HierarchicalDataTemplate DataType="{x:Type local:FileSystemItemViewModel}" ItemsSource="{Binding SubItems}">
+            <TextBlock Text="{Binding Name}"/>
+        </HierarchicalDataTemplate>
+    </Window.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="50"/>
+        </Grid.RowDefinitions>
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10">
+            <TextBlock Text="Начальная директория:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <TextBox x:Name="StartDirectoryTextBox" Width="300"/>
+
+        </StackPanel>
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="10">
+            <TextBlock Text="Поисковой паттерн:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <TextBox x:Name="SearchPatternTextBox" Width="300"/>
+        </StackPanel>
+        <Button x:Name="SearchButton" Content="Поиск" Grid.Row="2" Width="100" HorizontalAlignment="Left" Margin="10" Click="SearchButton_Click"/>
+        <TreeView x:Name="FoundFilesTreeView" Grid.Row="3" Margin="10"/>
+        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="10">
+            <TextBlock x:Name="CurrentDirectoryLabel" Margin="0,0,10,0"/>
+        </StackPanel>
+        <TextBlock x:Name="ElapsedTimeLabel" Grid.Row="5" Margin="10"/>
+        <Label x:Name="TotalFilesLabel" Grid.Row="5" Margin="10" HorizontalAlignment="Center" Content="Всего файлов: 0"/>
+        <Label x:Name="MatchedFilesLabel" Grid.Row="5" Margin="10" HorizontalAlignment="Right" Content="Подходящих файлов: 0"/>
+    </Grid>
+</Window>
