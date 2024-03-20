@@ -18,6 +18,8 @@ namespace FileSearchApp
         private readonly object _lock = new object();
         private readonly Stopwatch _stopwatch;
         private readonly DispatcherTimer _timer;
+        private ManualResetEventSlim _pauseEvent;
+        private bool isPaused = false;
         public event EventHandler<FileSystemItemEventArgs> FileFound;
         public event EventHandler<DirectoryChangedEventArgs> DirectoryChanged;
         private string _cacheFilePath;
@@ -33,7 +35,7 @@ namespace FileSearchApp
             _timer.Tick += Timer_Tick;
             FileFound += MainWindow_FileFound;
             DirectoryChanged += MainWindow_DirectoryChanged;
-
+            _pauseEvent = new ManualResetEventSlim(true);
             // Создаем папку для кэша, если она не существует
             string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             string searchAppFolder = Path.Combine(documentsPath, "SearchApp");
@@ -117,11 +119,20 @@ namespace FileSearchApp
             if (_cancellationTokenSource != null && !_cancellationTokenSource.IsCancellationRequested)
             {
                 _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose(); // Освобождаем ресурсы
+                _cancellationTokenSource = null;
+                _totalFilesChecked = 0;
+                _matchedFilesCount = 0;
+                _foundFiles.Clear();
+                FoundFilesTreeView.Items.Clear();
                 return;
             }
-
-            _foundFiles.Clear();
-            FoundFilesTreeView.Items.Clear();
+            Dispatcher.Invoke(() =>
+            {
+                CurrentDirectoryLabel.Text = $"Текущая директория: ";
+                MatchedFilesLabel.Content = $"Совпадающие файлы: 0";
+                SearchButton.Content = "Новый поиск";
+            });
             _cancellationTokenSource = new CancellationTokenSource();
             var startDirectory = StartDirectoryTextBox.Text;
             var searchPattern = SearchPatternTextBox.Text;
@@ -145,10 +156,16 @@ namespace FileSearchApp
             }
             finally
             {
+                Dispatcher.Invoke(() =>
+                {
+                    CurrentDirectoryLabel.Text = $"Поиск завершен!";
+                    SearchButton.Content = "Поиск";
+                });
                 _stopwatch.Stop();
                 _timer.Stop();
             }
         }
+
 
         private async Task SearchFilesAsync(string startDirectory, string searchPattern, CancellationToken cancellationToken)
         {
@@ -161,22 +178,27 @@ namespace FileSearchApp
 
             try
             {
+                _pauseEvent.Wait(cancellationToken);
                 _totalFilesChecked++;
 
                 var files = Directory.GetFiles(directory, searchPattern);
-
                 foreach (var file in files)
                 {
                     FileFound?.Invoke(this, new FileSystemItemEventArgs(Path.Combine(directory, file)));
                 }
-
                 // Получаем список поддиректорий и выполняем для каждой рекурсивный поиск
                 var directories = Directory.GetDirectories(directory);
                 foreach (var subDirectory in directories)
                 {
-                    SearchDirectory(subDirectory, searchPattern, cancellationToken, startDirectory);
+                    // Проверяем, была ли отменена операция
                     cancellationToken.ThrowIfCancellationRequested();
+
+                    SearchDirectory(subDirectory, searchPattern, cancellationToken, startDirectory);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // Операция отменена пользователем
             }
             catch (UnauthorizedAccessException)
             {
@@ -190,10 +212,11 @@ namespace FileSearchApp
             {
                 Dispatcher.Invoke(() =>
                 {
-                    TotalFilesLabel.Content = $"Total Files: {_totalFilesChecked}";
+                    TotalFilesLabel.Content = $"Всего файлов: {_totalFilesChecked}";
                 });
             }
         }
+
 
         /*
             UpdateTreeView
@@ -270,6 +293,28 @@ namespace FileSearchApp
                 }
             }
             return null;
+        }
+
+        private void PauseButton_Click(object sender, RoutedEventArgs e)
+        {
+            isPaused = !isPaused;
+
+            if (isPaused)
+            {
+                _pauseEvent.Reset();
+                Dispatcher.Invoke(() =>
+                {
+                    PauseButton.Content = $"Возобновить";
+                });
+            }
+            else
+            {
+                _pauseEvent.Set();
+                Dispatcher.Invoke(() =>
+                {
+                    PauseButton.Content = $"Пауза";
+                });
+            }
         }
     }
     // Модель представления элемента файловой системы
